@@ -15,18 +15,16 @@ Module Module1
         Dim PathIn As String = "."
         Dim PathOut As String = "NA"
 
+        Dim SingleFileIn As String = "NA"
+
         bExtractFT1 = False
         bExtractFT2 = False
         bExtractMS1 = False
         bExtractMS2 = False
         bMS2Zline = True
 
-        Console.WriteLine("Raxport 2.0 beta; Chongle Pan; ORNL")
+        Console.WriteLine("Raxport 3.0 beta; Chongle Pan; ORNL")
         Console.WriteLine("Use the --help option to get more information")
-
-
-        'process arguments
-        ' -w InputDir -o OutputDir -n1[Optional flag for no ms1 files] -n2[Optional flag for no ms2 files]
 
         Dim i As Integer = 0
         While i < sArgs.Length
@@ -41,6 +39,12 @@ Module Module1
             If StrComp(sArgs(i), "-o") = 0 Then
                 i = i + 1
                 PathOut = sArgs(i)
+            End If
+
+            'read -f single file input
+            If StrComp(sArgs(i), "-f") = 0 Then
+                i = i + 1
+                SingleFileIn = sArgs(i)
             End If
 
             'read --FT1, to generate FT1 files
@@ -68,8 +72,31 @@ Module Module1
 
             'read --help
             If StrComp(sArgs(i), "--help") = 0 Then
-                Console.WriteLine("Usage: -w WorkingDirectory -o OutputDiretory --FT1 [To generate FT1 files] --FT2 [To generate FT2 files] --MS1 [To generate MS1 files] --MS2 [To generate MS2 files] --noZ [Do not write Z lines in MS2 files, Z lines to be written by MS2ZAssign.exe].")
-                Console.WriteLine("Default values: input directory = current working directory; output directory = input directory.")
+                Console.WriteLine(" ")
+                Console.WriteLine("Usage:")
+                Console.WriteLine("-w WorkingDirectory [Extract all RAW files in the WorkingDirectory]")
+                Console.WriteLine("-f RawFile [Extract this single RAW file]")
+                Console.WriteLine("--FT1 [To generate FT1 files]")
+                Console.WriteLine("--MS1 [To generate MS1 files]")
+                Console.WriteLine("--FT2 [To generate FT2 files]")
+                Console.WriteLine("--MS2 [To generate MS2 files]")
+                Console.WriteLine("--noZ [Do not write Z lines in MS2 files]")
+                Console.WriteLine(" ")
+
+                Console.WriteLine("Example 1: Raxport.exe -w D:\MS_Data --FT2")
+                Console.WriteLine("This command extracts FT2 files from all RAW files under the directory of D:\MS_Data.")
+                Console.WriteLine(" ")
+
+                Console.WriteLine("Example 2:  Raxport.exe -f D:\MS_Data\Run1.raw --FT1 --FT2")
+                Console.WriteLine("This command extracts FT1 and FT2 files from the file D:\MS_Data\Run1.raw.")
+                Console.WriteLine("Note: Because the Xcalibur library appears to have some meomry leak issues, we recommand using the -f option to extract one file at a time. You may use the Perl script, batchExtract.pl, to extract all RAW files in a directory.")
+
+                Console.WriteLine("Example 3:  Raxport.exe -f D:\MS_Data\Run1.raw --MS2 --noZ")
+                Console.WriteLine("This command extracts an MS2 file for Sequest searches.")
+                Console.WriteLine(" ")
+
+                Exit Sub
+
             End If
 
             i = i + 1
@@ -86,9 +113,58 @@ Module Module1
         End If
 
 
-        'process all RAW files in PathIn and save all FT2 files into PathOut
-        Call PrecessDir(PathIn, PathOut)
+        If Not SingleFileIn = "NA" Then
+            'process this single input file
+            ProcessSingleFile(SingleFileIn)
+        Else
+            'process all RAW files in PathIn and save all FT2 files into PathOut
+            Call PrecessDir(PathIn, PathOut)
+        End If
 
+    End Sub
+
+
+    Sub ProcessSingleFile(ByVal SingleFileIn As String)
+
+        Dim sFT1Filename As String
+        Dim sFT2FileName As String
+        Dim sRawFileName As String
+
+        sRawFileName = SingleFileIn
+
+        If InStr(sRawFileName, ".RAW") > 0 Then
+            If bExtractFT1 Then
+                sFT1Filename = Replace(sRawFileName, ".RAW", ".FT1")
+            End If
+            If bExtractFT2 Then
+                sFT2FileName = Replace(sRawFileName, ".RAW", ".FT2")
+            End If
+            If bExtractMS1 Then
+                sFT1Filename = Replace(sRawFileName, ".RAW", ".MS1")
+            End If
+            If bExtractMS2 Then
+                sFT2FileName = Replace(sRawFileName, ".RAW", ".MS2")
+            End If
+
+            'process this RAW file
+            Call ProcessFile(sRawFileName, sFT1Filename, sFT2FileName)
+        ElseIf InStr(sRawFileName, ".raw") > 0 Then
+            If bExtractFT1 Then
+                sFT1Filename = Replace(sRawFileName, ".raw", ".FT1")
+            End If
+            If bExtractFT2 Then
+                sFT2FileName = Replace(sRawFileName, ".raw", ".FT2")
+            End If
+            If bExtractMS1 Then
+                sFT1Filename = Replace(sRawFileName, ".raw", ".MS1")
+            End If
+            If bExtractMS2 Then
+                sFT2FileName = Replace(sRawFileName, ".raw", ".MS2")
+            End If
+
+            'process this RAW file
+            Call ProcessFile(sRawFileName, sFT1Filename, sFT2FileName)
+        End If
     End Sub
 
     Sub PrecessDir(ByVal PathIn As String, ByVal PathOut As String)
