@@ -74,7 +74,7 @@ Module Module1
             If StrComp(sArgs(i), "--help") = 0 Then
                 Console.WriteLine(" ")
                 Console.WriteLine("Usage:")
-                Console.WriteLine("-w WorkingDirectory [Extract all RAW files in the WorkingDirectory]")
+                '               Console.WriteLine("-w WorkingDirectory [Extract all RAW files in the WorkingDirectory]")
                 Console.WriteLine("-f RawFile [Extract this single RAW file]")
                 Console.WriteLine("--FT1 [To generate FT1 files]")
                 Console.WriteLine("--MS1 [To generate MS1 files]")
@@ -83,15 +83,15 @@ Module Module1
                 Console.WriteLine("--noZ [Do not write Z lines in MS2 files]")
                 Console.WriteLine(" ")
 
-                Console.WriteLine("Example 1: Raxport.exe -w D:\MS_Data --FT2")
-                Console.WriteLine("This command extracts FT2 files from all RAW files under the directory of D:\MS_Data.")
-                Console.WriteLine(" ")
+                '                Console.WriteLine("Example 1: Raxport.exe -w D:\MS_Data --FT2")
+                '                Console.WriteLine("This command extracts FT2 files from all RAW files under the directory of D:\MS_Data.")
+                '                Console.WriteLine(" ")
 
-                Console.WriteLine("Example 2:  Raxport.exe -f D:\MS_Data\Run1.raw --FT1 --FT2")
+                Console.WriteLine("Example 1:  Raxport.exe -f D:\MS_Data\Run1.raw --FT1 --FT2")
                 Console.WriteLine("This command extracts FT1 and FT2 files from the file D:\MS_Data\Run1.raw.")
-                Console.WriteLine("Note: Because the Xcalibur library appears to have some meomry leak issues, we recommand using the -f option to extract one file at a time. You may use the Perl script, batchExtract.pl, to extract all RAW files in a directory.")
+                '                Console.WriteLine("Note: Because the Xcalibur library appears to have some meomry leak issues, we recommand using the -f option to extract one file at a time. You may use the Perl script, batchExtract.pl, to extract all RAW files in a directory.")
 
-                Console.WriteLine("Example 3:  Raxport.exe -f D:\MS_Data\Run1.raw --MS2 --noZ")
+                Console.WriteLine("Example 2:  Raxport.exe -f D:\MS_Data\Run1.raw --MS2 --noZ")
                 Console.WriteLine("This command extracts an MS2 file for Sequest searches.")
                 Console.WriteLine(" ")
 
