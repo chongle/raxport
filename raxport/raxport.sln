@@ -1,0 +1,20 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 11.00
+# Visual Studio 2010
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "raxport", "raxport\raxport.vcxproj", "{70D47198-0945-47C3-9608-D795DFBEBB39}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Win32 = Debug|Win32
+		Release|Win32 = Release|Win32
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{70D47198-0945-47C3-9608-D795DFBEBB39}.Debug|Win32.ActiveCfg = Debug|Win32
+		{70D47198-0945-47C3-9608-D795DFBEBB39}.Debug|Win32.Build.0 = Debug|Win32
+		{70D47198-0945-47C3-9608-D795DFBEBB39}.Release|Win32.ActiveCfg = Release|Win32
+		{70D47198-0945-47C3-9608-D795DFBEBB39}.Release|Win32.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
