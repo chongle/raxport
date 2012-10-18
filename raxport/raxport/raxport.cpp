@@ -1,5 +1,5 @@
 /********************************************************/
-// Raxport v3.1 by Chongle Pan, ORNL
+// Raxport v3.2 by Chongle Pan, ORNL
 // For exporting FT1 and FT2 files from Thermo raw files
 // Dependency on MSFileReader XRawFile2.dll
 /********************************************************/
@@ -9,7 +9,9 @@
 #include <iomanip>
 #include <fstream>
 #include <string>
+#include <sstream>
 #include <vector>
+#include <map>
 #include <windows.h>
 
 #import "C:\\Program Files (x86)\\Thermo\\MSFileReader\\XRawFile2.dll"
@@ -17,6 +19,8 @@
 using namespace std;
 using namespace MSFileReaderLib;
 
+bool noFT1 = false;
+bool noFT2 = false;
 
 // this is used only by GetPrecursorInfoFromScanNum
 struct PrecursorInfo
@@ -91,21 +95,6 @@ bool ProcessFiles( vector<wstring> vsRawFiles )
 	 {
 		 wstring sRawFilename = vsRawFiles[i];
 
-		 wstring sFT1Filename = sRawFilename.substr(0, sRawFilename.length()-4) + L".FT1";
-		 wstring sFT2Filename = sRawFilename.substr(0, sRawFilename.length()-4) + L".FT2";
-
-		 ofstream FT1stream;
-		 ofstream FT2stream;
-
-		 FT1stream.open(sFT1Filename.c_str());
-		 FT2stream.open(sFT2Filename.c_str());
-
-		 FT1stream << "H	Extractor	Raxport v3.1 Build 10/16/2012" << endl;
-		 FT1stream << "H	m/z	Intensity	Resolution	Baseline	Noise	Charge" << endl;
-
-		 FT2stream << "H	Extractor	Raxport v3.1 Build 10/16/2012" << endl;
-		 FT2stream << "H	m/z	Intensity	Resolution	Baseline	Noise	Charge" << endl;
-
 		 long fileOpenFlag = XRawfileCtrl->Open(sRawFilename.c_str());
 		 if(fileOpenFlag != 0){
 			wcout << "Unable to open .RAW file: " << sRawFilename << endl;
@@ -120,6 +109,35 @@ bool ProcessFiles( vector<wstring> vsRawFiles )
 		 XRawfileCtrl->GetLastSpectrumNumber(&lastScanNumber);
 		 wcout << "Extracting: " << sRawFilename << endl;
 		 cout << "Total Scan Range = " <<  firstScanNumber << " ... " << lastScanNumber << endl;
+
+		 // get instrument model
+		 BSTR bstrInstModel = NULL;
+		 XRawfileCtrl->GetInstModel ( &bstrInstModel );
+		 string sInstrumentModel = ConvertBSTRToMBS(bstrInstModel);
+
+		 // hash from scan number to analysis method
+		 map<long, string> mapScanToAnalysisMethod;
+
+		 // write file header lines
+		 ofstream FT1stream;
+		 if( ! noFT1 )
+		 {
+			wstring sFT1Filename = sRawFilename.substr(0, sRawFilename.length()-4) + L".FT1";
+			FT1stream.open(sFT1Filename.c_str());
+			FT1stream << "H	Extractor	Raxport v3.2" << endl;
+			FT1stream << "H	m/z	Intensity	Resolution	Baseline	Noise	Charge" << endl;
+			FT1stream << "H\tInstrument Model\t" << sInstrumentModel << endl;
+		 }
+
+		 ofstream FT2stream;
+		 if( ! noFT2 )
+		 {
+			wstring sFT2Filename = sRawFilename.substr(0, sRawFilename.length()-4) + L".FT2";
+			FT2stream.open(sFT2Filename.c_str());
+			FT2stream << "H	Extractor	Raxport v3.2" << endl;
+			FT2stream << "H	m/z	Intensity	Resolution	Baseline	Noise	Charge" << endl;
+			FT2stream << "H\tInstrument Model\t" << sInstrumentModel << endl;
+		 }
 
  	
 	    for(long scanNum = firstScanNumber;  scanNum <= lastScanNumber; scanNum++) 
@@ -191,15 +209,74 @@ SafeArrayDestroy( psaValues );
 		    BSTR bstrFilter = NULL;
 			XRawfileCtrl->GetFilterForScanNum( scanNum, &bstrFilter );
 			string sFilterText = ConvertBSTRToMBS(bstrFilter);
-//			cout << "filter text = " << sFilterText << endl; 
-		
-			double accurate_precursorMZ = 0;
+//			cout << "filter text = " << sFilterText << endl;
 
-			double isolationMZ = 0;
+			// get Mass Analyzer Type
+			long iMassAnalyzerType = 0;
+			string sMassAnalyzerTypeName = "Unknown-MS";
+			XRawfileCtrl->GetMassAnalyzerTypeForScanNum(scanNum, & iMassAnalyzerType);
+			switch(iMassAnalyzerType) {
+				case 0: sMassAnalyzerTypeName = "IT-MS"; break;
+				case 1: sMassAnalyzerTypeName = "TQ-MS"; break;
+				case 2: sMassAnalyzerTypeName = "SQ-MS"; break;
+				case 3: sMassAnalyzerTypeName = "TOF-MS"; break;
+				case 4: sMassAnalyzerTypeName = "FT-MS"; break;
+				case 5: sMassAnalyzerTypeName = "Sector-MS"; break;
+				default: break;
+			}
+
+			// get Scan Type
+			long iScanType = 0;
+			string sScanTypeName = "UnknownType";
+			XRawfileCtrl->GetScanTypeForScanNum(scanNum, & iScanType);
+			switch(iScanType) {
+				case 0: sScanTypeName = "Full"; break;
+				case 1: sScanTypeName = "SIM"; break;
+				case 2: sScanTypeName = "Zoom"; break;
+				case 3: sScanTypeName = "SRM"; break;
+				default: break;
+			}
+
+			// get Analysis Type,
+			ostringstream ssAnalysisMethod;
+			ssAnalysisMethod << sMassAnalyzerTypeName << MSOrder;
+			mapScanToAnalysisMethod[scanNum] = ssAnalysisMethod.str();
+
+			// variables for MS2 scans
+			double accurate_precursorMZ = 0;
+			double dIsolationWidth = 0;
+			string sActivationTypeName = "UnknownActivation";
+			string sParentScanAnalysisMethod = "Unknown-MS1";
+			double isolationMZ = 0; // this is actually likely to be Monoisotopic precursorMZ
 			int precursorCharge = 0;
-			int precursorScanNumber = 0;
+			long precursorScanNumber = 0;
+			// two values of monoisotopic m/z retrieved by different functions
+			double precursorMZ_Monoisotopic = 0;
+			double precursorMZ_IsolationTarget = 0;
+
 
 			if(MSOrder == 2) {
+				// get Activation Type
+				long iActivationType = 0;
+
+				XRawfileCtrl->GetActivationTypeForScanNum(scanNum, MSOrder, & iActivationType);
+				switch(iActivationType) {
+					case 0: sActivationTypeName = "CID"; break;
+					case 1: sActivationTypeName = "MPD"; break;
+					case 2: sActivationTypeName = "ECD"; break;
+					case 3: sActivationTypeName = "PQD"; break;
+					case 4: sActivationTypeName = "ETD"; break;
+					case 5: sActivationTypeName = "HCD"; break;
+					case 6: sActivationTypeName = "Any"; break;
+					case 7: sActivationTypeName = "SA"; break;
+					case 8: sActivationTypeName = "PTR"; break;
+					case 9: sActivationTypeName = "NETD"; break;
+					case 10: sActivationTypeName = "NPTR"; break;
+					default: break;
+				}
+
+				// get isolation width
+		//		XRawfileCtrl->GetIsolationWidthForScanNum(scanNum, MSOrder, &dIsolationWidth);
 
 				// call GetPrecursorInfoFromScanNum
 				VARIANT vPrecursorInfos;
@@ -211,6 +288,7 @@ SafeArrayDestroy( psaValues );
 				// Access the safearray buffer
 				BYTE* pData;
 				SafeArrayAccessData(vPrecursorInfos.parray, (void**)&pData);
+				// save the last precursor
 				for (int i=0; i < nPrecursorInfos; ++i)
 				{
 					// Copy the scan information from the safearray buffer
@@ -218,6 +296,7 @@ SafeArrayDestroy( psaValues );
 					memcpy(&info, pData + i * sizeof(MS_PrecursorInfo), sizeof(PrecursorInfo));
 					precursorScanNumber = info.nParentScanNumber;
 					isolationMZ = info.dIsolationMass;
+					
 					/*
 					cout << " scanNum " << scanNum 
 						<< " dIsolationMass " << info.dIsolationMass 
@@ -230,58 +309,66 @@ SafeArrayDestroy( psaValues );
 				SafeArrayUnaccessData(vPrecursorInfos.parray);
 				// end GetPrecursorInfoFromScanNum
 
-				// two values of monoisotopic m/z retrieved by different functions
-				double precursorMZ_1 = 0;
-				double precursorMZ_2 = 0;
+				// get parent scan method
+				map<long, string>::iterator iter= mapScanToAnalysisMethod.find(precursorScanNumber);
+				if( iter != mapScanToAnalysisMethod.end() ) 
+					sParentScanAnalysisMethod = iter->second;
+				else
+					sParentScanAnalysisMethod = "Unknown-MS1";
+
+
 
 				// retrieves monoisotopic m/z. 
 				VARIANT varPrecursor; 
 				VariantInit(&varPrecursor);
 				XRawfileCtrl->GetTrailerExtraValueForScanNum(scanNum, "Monoisotopic M/Z:" , &varPrecursor);
 				if( varPrecursor.vt == VT_R4 ) 
-					precursorMZ_1 = varPrecursor.fltVal;
+					precursorMZ_Monoisotopic = varPrecursor.fltVal;
 				else if( varPrecursor.vt == VT_R8 ) 
-					precursorMZ_1 = varPrecursor.dblVal;
+					precursorMZ_Monoisotopic = varPrecursor.dblVal;
 
 				// retrieves parent charge state
-				VARIANT varCharge; VariantInit(&varCharge);
+				VARIANT varCharge;
+				VariantInit(&varCharge);
 				XRawfileCtrl->GetTrailerExtraValueForScanNum(scanNum, "Charge State:" , &varCharge);
 				if( varCharge.vt == VT_I2 ) 
 					precursorCharge = varCharge.iVal;
 
 		//		cout << "precursorCharge= " << precursorCharge<< endl;
-		//		cout << "precursorMZ_1 = " << fixed << setprecision(15) << precursorMZ_1 << endl;
+		//		cout << "precursorMZ_Monoisotopic = " << fixed << setprecision(15) << precursorMZ_Monoisotopic << endl;
 				
 				// also retrieves monoisotopic m/z.
-				XRawfileCtrl->GetPrecursorMassForScanNum(scanNum, MSOrder, &precursorMZ_2);
-		//		cout << "precursorMZ_2 = " << precursorMZ_2 << endl;
+				XRawfileCtrl->GetPrecursorMassForScanNum(scanNum, MSOrder, &precursorMZ_IsolationTarget);
+		//		cout << "precursorMZ_IsolationTarget = " << precursorMZ_IsolationTarget << endl;
 
-				// precursorMZ_1 seems to be less prone to the 1-Da error, but it's often 0.
-				// use precursorMZ_2, when precursorMZ_1 is 0
-				if( precursorMZ_1 > 0.1 ){
-					accurate_precursorMZ = precursorMZ_1;
+				// precursorMZ_Monoisotopic seems to be less prone to the 1-Da error, but it's often 0.
+				// use precursorMZ_IsolationTarget, when precursorMZ_Monoisotopic is 0
+				if( precursorMZ_Monoisotopic > 0.1 ){
+					accurate_precursorMZ = precursorMZ_Monoisotopic;
 				}
 				else{
-					accurate_precursorMZ = precursorMZ_2;
+					accurate_precursorMZ = precursorMZ_IsolationTarget;
 				}
 
 			}
 
-			if( MSOrder == 1 )
+			if( MSOrder == 1 && (!noFT1) )
 			{
 				FT1stream << fixed << setprecision(5);
 				FT1stream << "S\t" <<  scanNum << "\t" << scanNum << endl;
 				FT1stream << "I\tRetentionTime\t" <<  retentionTime << endl;
-				FT1stream << "I\tFilter\t" <<  sFilterText << endl;
+				FT1stream << "I\tScanType\t" << sMassAnalyzerTypeName << MSOrder << endl;
+				FT1stream << "I\tScanFilter\t" <<  sFilterText << endl;
 			}
-			else
+			if( MSOrder != 1 && (!noFT2) )
 			{
 				FT2stream << fixed << setprecision(5);
 				FT2stream << "S\t" <<  scanNum << "\t" << scanNum << "\t"  << accurate_precursorMZ <<endl;
 				FT2stream << "Z\t" << precursorCharge << "\t" << precursorCharge * accurate_precursorMZ << endl;
 				FT2stream << "I\tRetentionTime\t" <<  retentionTime << endl;
-		//		FT2stream << "I\tisolationMZ\t" <<  isolationMZ << endl;
-				FT2stream << "I\tFilter\t" <<  sFilterText << endl;
+		//		FT2stream << "I\tScanType\t" <<  sScanTypeName << " " << sMassAnalyzerTypeName << MSOrder << " " << sActivationTypeName << " @ " << precursorMZ_IsolationTarget << endl;
+				FT2stream << "I\tScanType\t" << sParentScanAnalysisMethod << "/" << sMassAnalyzerTypeName << MSOrder << " = " << precursorMZ_IsolationTarget << " @ " << sActivationTypeName   << endl;
+				FT2stream << "I\tScanFilter\t" <<  sFilterText << endl;
 				FT2stream << "D\tParentScanNumber\t" <<  precursorScanNumber << endl;
 			}
 
@@ -301,7 +388,7 @@ SafeArrayDestroy( psaValues );
 				double* pdval;
 				pdval=(double*)varLabels.parray->pvData;
 			
-				if( MSOrder == 1 ){
+				if( MSOrder == 1 && (!noFT1) ){
 					for(int n = 0; n < peakNumber; n++){
 						FT1stream 
 							<< fixed << setprecision(5) << pdval[n*6+0] << "\t" 
@@ -312,7 +399,7 @@ SafeArrayDestroy( psaValues );
 							<< fixed << setprecision(0) << pdval[n*6+5] << endl;
 					}
 				}
-				else{
+				if( MSOrder != 1 && (!noFT2) ){
 					for(int n = 0; n < peakNumber; n++){
 						FT2stream 
 							<< fixed << setprecision(5) << pdval[n*6+0] << "\t" 
@@ -346,11 +433,11 @@ SafeArrayDestroy( psaValues );
 					{
 						double dMass = pDataPeaks[j].dMass;
 						double dIntensity = pDataPeaks[j].dIntensity;
-						if( MSOrder == 1 ){
+						if( MSOrder == 1 && (!noFT1) ){
 							FT1stream << fixed << setprecision(5) << dMass << "\t" 
 									  << fixed << setprecision(0) << dIntensity << endl; 
 						}
-						else{
+						if( MSOrder != 1 && (!noFT2) ){
 							FT2stream << fixed << setprecision(5) << dMass << "\t" 
 									  << fixed << setprecision(0) << dIntensity << endl;
 						}
@@ -379,8 +466,10 @@ SafeArrayDestroy( psaValues );
 			VariantClear(&varFlags);
 		}
 		XRawfileCtrl->Close();
-		FT1stream.close();
-		FT2stream.close();
+		if( ! noFT1 )
+			FT1stream.close();
+		if( ! noFT2 )
+			FT2stream.close();
 	}
 	return true;
 }
@@ -464,10 +553,21 @@ bool initializeArguments(int argc, char* argv[], wstring & sPath)
 		}
 		else if (vsArguments[i] == "-h" || vsArguments[i] == "--help")
 		{
-			cout << "Usage: -w WorkingDirectory" << endl;
-			cout << "FT1 and FT2 files will be extracted from all raw files in the working directory and its sub-directories." << endl;
-			cout << "If no option is provided, the default working directory is the current directory." << endl;
+			cout << "Usage: raxport.exe -w WorkingDirectory" << endl;
+			cout << "[-w WorkingDirectory]\t\tExtract all raw files in the working directory and its sub-directories.\tDefault: current directory" << endl;
+			cout << "[--noFT1]\t\tDo not extract FT1 files.\tDefault: false" << endl;
+			cout << "[--noFT2]\t\tDo not extract FT2 files.\tDefault: false" << endl;
+			cout << "[--help]\t\tGet help information" << endl;
+			cout << "If no option is provided, extract both FT1 and FT2 files from the current directory" << endl;
 			return false;
+		}
+		else if (vsArguments[i] == "--noFT1")
+		{
+			noFT1 = true;
+		}
+		else if (vsArguments[i] == "--noFT2")
+		{
+			noFT2 = true;
 		}
 		else 
 		{
@@ -486,7 +586,7 @@ bool initializeArguments(int argc, char* argv[], wstring & sPath)
 
 int main(int argc, char* argv[])
 {
-	cout << endl << "Raxport 3.1 Build 10/16/2012" << endl << endl;
+	cout << endl << "Raxport 3.2 Build 10/18/2012" << endl << endl;
 
 	wstring sPath = L""; 
 	if( ! initializeArguments(argc, argv, sPath) )
