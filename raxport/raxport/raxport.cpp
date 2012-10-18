@@ -509,14 +509,15 @@ void findMatchedFiles(wstring sPath, wstring namePattern, vector<wstring> & vsRa
 
 	hFind = FindFirstFile(searchPattern.c_str(), &FindFileData);
 	while(hFind != INVALID_HANDLE_VALUE)
-	{
+	{	
 		wstring foundFile( FindFileData.cFileName );
-		if( FindFileData.dwFileAttributes == FILE_ATTRIBUTE_DIRECTORY
-            && foundFile != L"." && foundFile != L"..")
+	//	wcout << foundFile << endl;
+		if( ( FindFileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY ) // this is a directory
+            && foundFile != L"." && foundFile != L"..") // it's not those two directories
 		{
 			// found a subdirectory; recurse into it
 			wstring pathFilename = sPath + foundFile;
-//			wcout << "Go to sub-directory: " << pathFilename << endl;
+	//		wcout << "Go to sub-directory: " << pathFilename << endl;
 			findMatchedFiles(pathFilename, namePattern, vsRawFilenames);
 		}
 		if(FindNextFile(hFind, &FindFileData) == FALSE)
