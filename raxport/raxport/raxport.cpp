@@ -1,5 +1,5 @@
 /********************************************************/
-// Raxport v3.2 by Chongle Pan, ORNL
+// Raxport v3.3 by Chongle Pan, ORNL
 // For exporting FT1 and FT2 files from Thermo raw files
 // Dependency on MSFileReader XRawFile2.dll
 /********************************************************/
@@ -81,7 +81,7 @@ bool ProcessFiles( vector<wstring> vsRawFiles )
 	 
      if (FAILED(hr)) {
 		 cout << endl;
-         cout << "Cannot access MSFileReader XRawFile2.dll" << endl;
+         cout << "Error: cannot open MSFileReader XRawFile2.dll" << endl;
          cout << "Please install the latest MSFileReader from Thermo Scientific freely available at" << endl;
 		 cout << "http://sjsupport.thermofinnigan.com/public/detail.asp?id=703" << endl;
          return false;
@@ -124,7 +124,7 @@ bool ProcessFiles( vector<wstring> vsRawFiles )
 		 {
 			wstring sFT1Filename = sRawFilename.substr(0, sRawFilename.length()-4) + L".FT1";
 			FT1stream.open(sFT1Filename.c_str());
-			FT1stream << "H	Extractor	Raxport v3.2" << endl;
+			FT1stream << "H	Extractor	Raxport v3.3" << endl;
 			FT1stream << "H	m/z	Intensity	Resolution	Baseline	Noise	Charge" << endl;
 			FT1stream << "H\tInstrument Model\t" << sInstrumentModel << endl;
 		 }
@@ -134,7 +134,7 @@ bool ProcessFiles( vector<wstring> vsRawFiles )
 		 {
 			wstring sFT2Filename = sRawFilename.substr(0, sRawFilename.length()-4) + L".FT2";
 			FT2stream.open(sFT2Filename.c_str());
-			FT2stream << "H	Extractor	Raxport v3.2" << endl;
+			FT2stream << "H	Extractor	Raxport v3.3" << endl;
 			FT2stream << "H	m/z	Intensity	Resolution	Baseline	Noise	Charge" << endl;
 			FT2stream << "H\tInstrument Model\t" << sInstrumentModel << endl;
 		 }
@@ -392,10 +392,10 @@ SafeArrayDestroy( psaValues );
 					for(int n = 0; n < peakNumber; n++){
 						FT1stream 
 							<< fixed << setprecision(5) << pdval[n*6+0] << "\t" 
-							<< fixed << setprecision(0) << pdval[n*6+1] << "\t" 
+							<< fixed << setprecision(2) << pdval[n*6+1] << "\t" 
 							<< fixed << setprecision(0) << pdval[n*6+2] << "\t"
-							<< fixed << setprecision(0) << pdval[n*6+3] << "\t" 
-							<< fixed << setprecision(0) << pdval[n*6+4] << "\t" 
+							<< fixed << setprecision(2) << pdval[n*6+3] << "\t" 
+							<< fixed << setprecision(2) << pdval[n*6+4] << "\t" 
 							<< fixed << setprecision(0) << pdval[n*6+5] << endl;
 					}
 				}
@@ -403,10 +403,10 @@ SafeArrayDestroy( psaValues );
 					for(int n = 0; n < peakNumber; n++){
 						FT2stream 
 							<< fixed << setprecision(5) << pdval[n*6+0] << "\t" 
-							<< fixed << setprecision(0) << pdval[n*6+1] << "\t" 
+							<< fixed << setprecision(2) << pdval[n*6+1] << "\t" 
 							<< fixed << setprecision(0) << pdval[n*6+2] << "\t"
-							<< fixed << setprecision(0) << pdval[n*6+3] << "\t" 
-							<< fixed << setprecision(0) << pdval[n*6+4] << "\t" 
+							<< fixed << setprecision(2) << pdval[n*6+3] << "\t" 
+							<< fixed << setprecision(2) << pdval[n*6+4] << "\t" 
 							<< fixed << setprecision(0) << pdval[n*6+5] << endl;
 					}
 				}
@@ -435,11 +435,11 @@ SafeArrayDestroy( psaValues );
 						double dIntensity = pDataPeaks[j].dIntensity;
 						if( MSOrder == 1 && (!noFT1) ){
 							FT1stream << fixed << setprecision(5) << dMass << "\t" 
-									  << fixed << setprecision(0) << dIntensity << endl; 
+									  << fixed << setprecision(2) << dIntensity << endl; 
 						}
 						if( MSOrder != 1 && (!noFT2) ){
 							FT2stream << fixed << setprecision(5) << dMass << "\t" 
-									  << fixed << setprecision(0) << dIntensity << endl;
+									  << fixed << setprecision(2) << dIntensity << endl;
 						}
 
 					}
@@ -587,7 +587,7 @@ bool initializeArguments(int argc, char* argv[], wstring & sPath)
 
 int main(int argc, char* argv[])
 {
-	cout << endl << "Raxport 3.2 Build 10/18/2012" << endl << endl;
+	cout << endl << "Raxport 3.3 Build 10/20/2012" << endl << endl;
 
 	wstring sPath = L""; 
 	if( ! initializeArguments(argc, argv, sPath) )
