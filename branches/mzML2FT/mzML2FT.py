@@ -3,7 +3,6 @@
 ## Import Python package modules
 import sys, getopt, warnings, os, re
 
-import pymzml
 
 def parse_options(argv):
 
@@ -30,14 +29,14 @@ def parse_options(argv):
         if option in ("-o", "--output-dir"):
             output_dir = value
 
-    mzML_filename_list = get_file_list_with_ext(working_dir, ".mzML")
-    mzML_filename_list = mzML_filename_list + get_file_list_with_ext(working_dir, ".mzml")
-    mzML_filename_list = mzML_filename_list + get_file_list_with_ext(working_dir, ".MZML")
+    mgf_filename_list = get_file_list_with_ext(working_dir, ".mgf")
+    mgf_filename_list = mgf_filename_list + get_file_list_with_ext(working_dir, ".Mgf")
+    mgf_filename_list = mgf_filename_list + get_file_list_with_ext(working_dir, ".MGF")
     
     if (output_dir == "") :
         output_dir = working_dir
 
-    return [mzML_filename_list, output_dir]
+    return [mgf_filename_list, output_dir]
     
     
     
@@ -68,93 +67,62 @@ def get_file_list_with_ext(working_dir, file_ext):
 
     return file_list
 
-
-def ParseSpectrum_FT2(current_spectrum, current_file,  iParentScanNumber) :
-    #print "precursors charge", current_spectrum['precursors'][0].get('charge')
-    #print "precursors mz", current_spectrum['precursors'][0].get('mz')
-    #print "S:", current_spectrum['id']
-    iScanNumber = current_spectrum['id']
-    sParentMZ   = "%.5f" % current_spectrum['precursors'][0].get('mz')
-    if (current_spectrum['precursors'][0].get('charge') != None ) :
-        iParentCharge = current_spectrum['precursors'][0].get('charge')
-        sParentMass   = "%.5f" %  (current_spectrum['precursors'][0].get('mz')  * iParentCharge)
+def outputFT2(current_spectrum_list, s_scanId, d_precursor_mz, i_precursor_z, current_FT2_file, d_retention_time):
+    current_FT2_file.write("S\t"+s_scanId+"\t"+s_scanId+"\t"+str(d_precursor_mz)+"\n")
+    if (i_precursor_z == 0) :
+        z_mz = 0
     else :
-        iParentCharge = 0
-        sParentMass   = "0"
-    dRetentionTime = "%.5f" %  current_spectrum['MS:1000016']
-    sScanType      = "NA"
-    sScanFilter    = current_spectrum['filter string']
+        z_mz = i_precursor_z*d_precursor_mz
+    current_FT2_file.write("Z\t"+str(i_precursor_z)+"\t"+str(z_mz)+"\n")
+    current_FT2_file.write("I\tRetentionTime\t"+str(d_retention_time)+"\n")
+    for each_peak in current_spectrum_list :
+        current_FT2_file.write(each_peak[0]+"\t"+each_peak[1]+"\t0\t0\t0\t0\n")
 
-    current_file.write("S\t"+str(iScanNumber)+"\t"+str(iScanNumber)+"\t"+sParentMZ+"\n")
-    current_file.write("Z\t"+str(iParentCharge)+"\t"+ sParentMass +"\n")
-    current_file.write("I\tRetentionTime\t"+str(dRetentionTime)+"\n")
-    current_file.write("I\tScanType\t"+sScanType+"\n")
-    current_file.write("I\tScanFilter\t"+sScanFilter+"\n")
-    current_file.write("D\tParentScanNumber\t"+str(iParentScanNumber)+"\n")
-
-    for each_fragment_mz, each_fragment_intensity in current_spectrum.centroidedPeaks :
-        if each_fragment_intensity > 0 :
-            seach_fragment_mz        = "%.5f" %  each_fragment_mz
-            seach_fragment_intensity = "%.2f" %  each_fragment_intensity
-            current_file.write(seach_fragment_mz +"\t"+seach_fragment_intensity+"\t0\t0\t0\t0\n")
-
-
-def ParseSpectrum_FT1(current_spectrum, current_file) :
-    #print "MS2 level:", current_spectrum['ms level'], current_spectrum['MS:1000511']    
-    #print "Scan Start Time:", current_spectrum['MS:1000016']
-    #print "ScanFilter:", current_spectrum['filter string']
-    iScanNumber = current_spectrum['id']
-    dRetentionTime = "%.5f" %  current_spectrum['MS:1000016']
-    sScanType      = "NA"
-    sScanFilter    = current_spectrum['filter string']
-
-    current_file.write("S\t"+str(iScanNumber)+"\t"+str(iScanNumber)+"\n")
-    current_file.write("I\tRetentionTime\t"+str(dRetentionTime)+"\n")
-    current_file.write("I\tScanType\t"+sScanType+"\n")
-    current_file.write("I\tScanFilter\t"+sScanFilter+"\n")
-
-    for each_fragment_mz, each_fragment_intensity in current_spectrum.centroidedPeaks :
-        if each_fragment_intensity > 0 :
-            seach_fragment_mz        = "%.5f" %  each_fragment_mz
-            seach_fragment_intensity = "%.2f" %  each_fragment_intensity
-            current_file.write(seach_fragment_mz+"\t"+seach_fragment_intensity+"\t0\t0\t0\t0\n")
-
-    return iScanNumber
-    
-
-def ConvertmzMLFile(current_mzML_filename, output_dir) :
-    mzMLFileNameBase = os.path.basename(current_mzML_filename)
-    (mzMLFileNameRoot, mzMLFileNameExt) = os.path.splitext(mzMLFileNameBase)
-    current_FT1_filename = output_dir + os.sep + mzMLFileNameRoot + ".FT1"
-    current_FT2_filename = output_dir + os.sep + mzMLFileNameRoot + ".FT2"
-    current_FT1_file = file(current_FT1_filename, "w")
+def ConvertMgfFile(current_mgf_filename, output_dir) :
+    MgfFileNameBase = os.path.basename(current_mgf_filename)
+    (MgfFileNameRoot, MgfFileNameExt) = os.path.splitext(MgfFileNameBase)
+    current_FT2_filename = output_dir + os.sep + MgfFileNameRoot + ".FT2"
     current_FT2_file = file(current_FT2_filename, "w")
-    msscan_list = pymzml.run.Reader(current_mzML_filename, extraAccessions=[('MS:1000515',['value'])] )
-    current_FT1_file.write("H\tExtractor\tmzML2FT\n")
-    current_FT2_file.write("H\tExtractor\tmzML2FT\n")
-    current_FT1_file.write("H\tm/z\tIntensity\tResolution\tBaseline\tNoise\tCharge\n")
+    current_mgf_file = open(current_mgf_filename)
+    current_FT2_file.write("H\tExtractor\tmgf2FT\n")
     current_FT2_file.write("H\tm/z\tIntensity\tResolution\tBaseline\tNoise\tCharge\n")
-    current_FT1_file.write("H\tInstrument Model\tNA\n")
     current_FT2_file.write("H\tInstrument Model\tNA\n")
 
-    #bFirstSpectrum = True 
-    iParentScanNumber = 0
-    for each_spectrum in msscan_list :
-        if each_spectrum['ms level'] == 1 :
-            iParentScanNumber = ParseSpectrum_FT1(each_spectrum, current_FT1_file)
-        elif each_spectrum['ms level'] == 2 :
-            ParseSpectrum_FT2(each_spectrum, current_FT2_file, iParentScanNumber)
-            
-        else :
-            if (each_spectrum['ms level'] != None) :
-                print "wrong ms level: "+ each_spectrum['ms level']
-            if (each_spectrum['id'] != None) and (each_spectrum['id'] != "TIC") and (each_spectrum['id'] != "tic"):
-                print "the troubling Scan Number is " + each_spectrum['id']
-            elif (each_spectrum['id'] != "TIC") and (each_spectrum['id'] != "tic") :
-                print "the current precursor nubmer is " + str(iParentScanNumber)
-            # exit(1)
+    current_spectrum_list = []
 
-    current_FT1_file.close()
+    for each_line in current_mgf_file :
+        each_line = each_line.strip()
+        if (each_line == "") :
+            continue
+        if each_line.startswith("BEGIN IONS") :
+            current_spectrum_list = []
+            s_scanId = ""
+            d_precursor_mz = 0
+            i_precursor_z  = 0
+            continue
+        if each_line.startswith("END IONS") :
+            if (s_scanId == "") or (d_precursor_mz == 0) :
+                print "ill scan", s_scanId
+            else:
+                outputFT2(current_spectrum_list, s_scanId, d_precursor_mz, i_precursor_z, current_FT2_file, d_retention_time)
+            continue
+        
+        if each_line.startswith("TITLE=scanId=") :
+            s_scanId = each_line.split("=")[2]
+        elif (each_line.startswith("CHARGE=")):
+            i_precursor_z = int(each_line.split("=")[1])
+        elif (each_line.startswith("PEPMASS=")):
+            precursor_info = each_line.split("=")[1]
+            d_precursor_mz = precursor_info.split(" ")[0]
+        elif (each_line.startswith("RTINSECONDS=")) :
+            d_retention_time = each_line.split("=")[1]
+            
+        elif (each_line[0:1].isdigit()) :
+            
+            peak_info = each_line.split(" ")
+           # print peak_info
+            current_spectrum_list.append([peak_info[0], peak_info[1]])
+
     current_FT2_file.close()
 
 def main(argv=None):
@@ -163,9 +131,9 @@ def main(argv=None):
     if argv is None:
         argv = sys.argv
         # parse options
-        [mzML_filename_list, output_dir] = parse_options(argv)
-    for each_mzML_filename in mzML_filename_list :
-        ConvertmzMLFile(each_mzML_filename, output_dir)
+        [mgf_filename_list, output_dir] = parse_options(argv)
+    for each_mgf_filename in mgf_filename_list :
+        ConvertMgfFile(each_mgf_filename, output_dir)
         
 
 
